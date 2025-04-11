@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --terminal-green: #39ff14;
+  --terminal-blue: #00bfff;
+  --terminal-bg: #0a0a0a;
 }
 
 @theme inline {
@@ -23,4 +26,49 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Terminal styling */
+.dark {
+  --background: var(--terminal-bg);
+  --foreground: var(--terminal-green);
+}
+
+::selection {
+  background-color: rgba(57, 255, 20, 0.25);
+  color: var(--terminal-green);
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Terminal scrollbar styling */
+.dark::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dark::-webkit-scrollbar-thumb {
+  background: rgba(57, 255, 20, 0.3);
+  border-radius: 4px;
+}
+
+.dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(57, 255, 20, 0.5);
 }
