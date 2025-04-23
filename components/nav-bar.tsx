@@ -1,0 +1,106 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { 
+  Save, 
+  Upload, 
+  Download, 
+  Play, 
+  Settings, 
+  PanelLeft, 
+  PanelRight,
+  Workflow
+} from "lucide-react";
+import { toast } from "sonner";
+import { useWorkflowStore } from "@/lib/stores/workflow-store";
+
+export function NavBar() {
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  
+  const { saveWorkflow, loadWorkflow } = useWorkflowStore();
+  
+  const handleSave = () => {
+    saveWorkflow();
+    toast.success("Workflow saved successfully");
+  };
+  
+  const handleRun = () => {
+    toast.success("Workflow execution started");
+    // Simulation of workflow execution
+    setTimeout(() => {
+      toast.success("Workflow executed successfully");
+    }, 2000);
+  };
+
+  const toggleLeftPanel = () => {
+    setLeftPanelOpen(!leftPanelOpen);
+    document.dispatchEvent(new CustomEvent('toggle-left-panel', { detail: !leftPanelOpen }));
+  };
+
+  const toggleRightPanel = () => {
+    setRightPanelOpen(!rightPanelOpen);
+    document.dispatchEvent(new CustomEvent('toggle-right-panel', { detail: !rightPanelOpen }));
+  };
+
+  return (
+    <nav className="border-b border-border bg-card p-4 flex justify-between items-center z-10">
+      <div className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center">
+          <Workflow className="h-6 w-6 text-primary mr-2" />
+          <span className="text-xl font-semibold text-primary">FlowWeave</span>
+        </Link>
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleLeftPanel}
+          className={leftPanelOpen ? "bg-muted" : ""}
+          title="Toggle left panel"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleRightPanel}
+          className={rightPanelOpen ? "bg-muted" : ""}
+          title="Toggle right panel"
+        >
+          <PanelRight className="h-4 w-4" />
+        </Button>
+        
+        <div className="hidden md:flex items-center space-x-2">
+          <Button variant="outline" onClick={handleSave}>
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+          
+          <Button variant="outline" onClick={() => loadWorkflow()}>
+            <Upload className="h-4 w-4 mr-2" />
+            Load
+          </Button>
+          
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
+        
+        <Button variant="default" onClick={handleRun}>
+          <Play className="h-4 w-4 mr-2" />
+          Run Workflow
+        </Button>
+        
+        <Button variant="outline" size="icon" title="Settings">
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
+    </nav>
+  );
+}
