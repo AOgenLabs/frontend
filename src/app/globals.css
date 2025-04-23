@@ -1,26 +1,56 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import ReactFlow styles */
+@import 'reactflow/dist/style.css';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground-rgb: 205, 214, 244;
+  --background-rgb: 30, 30, 46;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+}
+
+/* ReactFlow custom styling */
+.react-flow__node {
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #313244;
+  border: 2px solid #cdd6f4;
+}
+
+.react-flow__edge-path {
+  stroke: #6c7086;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #cba6f7;
+}
+
+.react-flow__controls {
+  background-color: #181825;
+  border-color: #313244;
+  border-radius: 8px;
+}
+
+.react-flow__controls-button {
+  border-color: #313244;
+  color: #cdd6f4;
+}
+
+.react-flow__minimap {
+  background-color: #181825;
+  border-radius: 8px;
+  border: 1px solid #313244;
 }
