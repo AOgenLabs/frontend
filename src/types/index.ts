@@ -1,6 +1,6 @@
 export interface DraggableItem {
     id: string;
-    type: 'trigger' | 'action' | 'delay';
+    type: 'trigger' | 'action' | 'delay' | 'condition';
     label: string;
     color: string;
     icon?: string;
@@ -11,6 +11,11 @@ export interface NodeData {
     type: string;
     label: string;
     color: string;
+    config?: {
+        chatId?: string;
+        message?: string;
+        [key: string]: any;
+    };
 }
 
 export interface CanvasNode {

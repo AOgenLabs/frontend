@@ -2,23 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Google Fonts - Inter for modern UI */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 /* Import ReactFlow styles */
 @import 'reactflow/dist/style.css';
 
 :root {
   --foreground-rgb: 205, 214, 244;
   --background-rgb: 30, 30, 46;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ReactFlow custom styling */
+/* Modern typography */
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Make elements in the canvas more interactive */
 .react-flow__node {
-  border-radius: 8px;
-  font-family: inherit;
+  border-radius: 1rem;
+  font-family: var(--font-sans);
+  transition: all 0.2s ease;
+}
+
+.react-flow__node:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .react-flow__handle {
@@ -27,30 +64,52 @@ body {
   border-radius: 50%;
   background-color: #313244;
   border: 2px solid #cdd6f4;
+  transition: all 0.2s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.2);
+  background-color: #cba6f7;
 }
 
 .react-flow__edge-path {
   stroke: #6c7086;
   stroke-width: 2;
+  transition: stroke 0.2s ease;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: #cba6f7;
+  stroke-width: 3;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #89b4fa;
+  stroke-width: 3;
 }
 
 .react-flow__controls {
   background-color: #181825;
   border-color: #313244;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .react-flow__controls-button {
   border-color: #313244;
   color: #cdd6f4;
+  transition: all 0.2s ease;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #313244;
 }
 
 .react-flow__minimap {
   background-color: #181825;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid #313244;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }

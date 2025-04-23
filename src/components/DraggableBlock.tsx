@@ -8,10 +8,25 @@ interface DraggableBlockProps {
     item: DraggableItem;
 }
 
+// Map of icon emojis for different item types
+const itemIcons: Record<string, string> = {
+    'trigger-webhook': '🔗',
+    'trigger-schedule': '⏰',
+    'trigger-email': '📧',
+    'trigger-form': '📝',
+    'action-email': '📤',
+    'action-api': '🌐',
+    'action-telegram': '📱',
+    'delay': '⏱️',
+    'condition': '🔀',
+};
+
 export default function DraggableBlock({ item }: DraggableBlockProps) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: item.id,
     });
+
+    const icon = itemIcons[item.id] || '📦';
 
     return (
         <motion.div
@@ -19,21 +34,22 @@ export default function DraggableBlock({ item }: DraggableBlockProps) {
             {...attributes}
             {...listeners}
             className="cursor-grab active:cursor-grabbing"
-            whileHover={{ scale: 1.02 }}
+            whileHover={{ scale: 1.02, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
             whileTap={{ scale: 0.98 }}
             style={{
                 opacity: isDragging ? 0.5 : 1,
             }}
         >
             <div
-                className="p-3 rounded-lg shadow-md"
+                className="w-[100px] h-[100px] rounded-xl shadow-md flex flex-col justify-center items-center"
                 style={{
-                    backgroundColor: `${item.color}20`, // 20% opacity of the color
-                    borderLeft: `4px solid ${item.color}`,
+                    backgroundColor: `${item.color}15`, // 15% opacity of the color
+                    border: `1px solid ${item.color}40`,
+                    transition: 'all 0.2s ease',
                 }}
             >
-                <div className="font-medium text-sm">{item.label}</div>
-                <div className="text-xs text-[#a6adc8] mt-1">{item.type}</div>
+                <div className="text-2xl mb-2" role="img" aria-label={item.label}>{icon}</div>
+                <div className="font-medium text-xs text-center leading-tight">{item.label}</div>
             </div>
         </motion.div>
     );
