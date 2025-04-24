@@ -107,6 +107,18 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.2
         version: 1.2.4(@types/react-dom@18.2.7)(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@reactflow/background':
+        specifier: ^11.3.14
+        version: 11.3.14(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@reactflow/controls':
+        specifier: ^11.2.14
+        version: 11.2.14(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@reactflow/core':
+        specifier: ^11.11.4
+        version: 11.11.4(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@reactflow/minimap':
+        specifier: ^11.7.14
+        version: 11.7.14(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@types/node':
         specifier: 20.6.2
         version: 20.6.2
