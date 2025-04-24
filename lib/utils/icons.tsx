@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Webhook, Clock, FormInput, Mail, Globe, Database, Filter, Repeat, Workflow, MessageCircle, DivideIcon as LucideIcon } from 'lucide-react';
+import { Webhook, Clock, FormInput, Mail, Globe, Filter, Repeat, Workflow, MessageCircle, DivideIcon as LucideIcon } from 'lucide-react';
 
 type IconMap = {
   [key: string]: React.ReactNode;
@@ -13,7 +13,6 @@ const icons: IconMap = {
   formInput: <FormInput className="h-4 w-4" />,
   mail: <Mail className="h-4 w-4" />,
   globe: <Globe className="h-4 w-4" />,
-  database: <Database className="h-4 w-4" />,
   filter: <Filter className="h-4 w-4" />,
   repeat: <Repeat className="h-4 w-4" />,
   workflow: <Workflow className="h-4 w-4" />,
