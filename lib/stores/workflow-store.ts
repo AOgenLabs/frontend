@@ -126,27 +126,6 @@ export const NODE_TYPES = {
     category: 'Triggers',
     items: [
       {
-        type: 'webhook',
-        label: 'Webhook',
-        icon: 'webhook',
-        description: 'Trigger when a webhook is received',
-        config: { endpoint: '' }
-      },
-      {
-        type: 'schedule',
-        label: 'Schedule',
-        icon: 'clock',
-        description: 'Trigger on a schedule',
-        config: { schedule: '0 0 * * *' }
-      },
-      {
-        type: 'form',
-        label: 'Form Submission',
-        icon: 'formInput',
-        description: 'Trigger when a form is submitted',
-        config: { formId: '' }
-      },
-      {
         type: 'telegram-receive',
         label: 'Receive Telegram',
         icon: 'messageCircle',
@@ -163,25 +142,11 @@ export const NODE_TYPES = {
     category: 'Actions',
     items: [
       {
-        type: 'email',
-        label: 'Send Email',
-        icon: 'mail',
-        description: 'Send an email',
-        config: { to: '', subject: '', body: '' }
-      },
-      {
         type: 'telegram',
         label: 'Send Telegram',
         icon: 'messageCircle',
         description: 'Send a Telegram message',
         config: { chatId: '', message: '' }
-      },
-      {
-        type: 'http',
-        label: 'HTTP Request',
-        icon: 'globe',
-        description: 'Make an HTTP request',
-        config: { url: '', method: 'GET', headers: {}, body: '' }
       },
       {
         type: 'arweave-upload',
@@ -198,20 +163,6 @@ export const NODE_TYPES = {
   logic: {
     category: 'Logic',
     items: [
-      {
-        type: 'filter',
-        label: 'Filter',
-        icon: 'filter',
-        description: 'Filter data based on conditions',
-        config: { condition: '' }
-      },
-      {
-        type: 'transform',
-        label: 'Transform',
-        icon: 'repeat',
-        description: 'Transform data',
-        config: { transformation: '' }
-      },
       {
         type: 'delay',
         label: 'Delay',
