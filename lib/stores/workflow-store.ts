@@ -421,7 +421,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         throw new Error(`Node with id ${nodeId} not found`);
       }
 
-      console.log(`Executing node '${node.data.label}' (${node.data.type}) with ID ${nodeId}`);
+      const startTime = new Date().toISOString();
+      console.log(`[${startTime}] STARTING node '${node.data.label}' (${node.data.type}) with ID ${nodeId}`);
 
       // Update node state to running
       set(state => ({
@@ -485,11 +486,41 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
                   const latestFile = recentFiles[0]; // There will only be one file in the array if there's a change
                   console.log(`Processing latest file: ${latestFile.fileName || latestFile.id}`);
 
-                  for (const edge of outgoingEdges) {
+                  // Determine node types to pass different context to each node
+                  const arweaveNodes = [];
+                  const telegramNodes = [];
+
+                  outgoingEdges.forEach(edge => {
                     const targetNode = nodes.find(n => n.id === edge.target);
-                    console.log(`Sending latest file to node: ${targetNode?.data.label || edge.target}`);
-                    await get().executeNode(edge.target, latestFile);
-                  }
+                    if (targetNode) {
+                      if (targetNode.data.type === 'arweave-upload') {
+                        arweaveNodes.push(edge);
+                      } else if (targetNode.data.type === 'telegram') {
+                        telegramNodes.push(edge);
+                      }
+                    }
+                  });
+
+                  // Execute telegram nodes first with "parallel before" context
+                  const telegramPromises = telegramNodes.map(edge => {
+                    const targetNode = nodes.find(n => n.id === edge.target);
+                    console.log(`Sending "parallel before" message to Telegram node: ${targetNode?.data.label || edge.target}`);
+                    return get().executeNode(edge.target, {
+                      ...latestFile,
+                      messageContext: 'before',
+                      originalMessage: node.data.config.message || 'parallel before'
+                    });
+                  });
+
+                  // Execute arweave nodes
+                  const arweavePromises = arweaveNodes.map(edge => {
+                    const targetNode = nodes.find(n => n.id === edge.target);
+                    console.log(`Sending file to Arweave node: ${targetNode?.data.label || edge.target}`);
+                    return get().executeNode(edge.target, latestFile);
+                  });
+
+                  // Execute all nodes in parallel
+                  await Promise.all([...telegramPromises, ...arweavePromises]);
 
                   // After 2 seconds, go back to running state
                   setTimeout(() => {
@@ -535,11 +566,41 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
               // Get outgoing edges and forward the latest file
               const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
 
-              for (const edge of outgoingEdges) {
+              // Determine node types to pass different context to each node
+              const arweaveNodes = [];
+              const telegramNodes = [];
+
+              outgoingEdges.forEach(edge => {
                 const targetNode = get().nodes.find(n => n.id === edge.target);
-                console.log(`Sending latest file to node: ${targetNode?.data.label || edge.target}`);
-                await get().executeNode(edge.target, fileData);
-              }
+                if (targetNode) {
+                  if (targetNode.data.type === 'arweave-upload') {
+                    arweaveNodes.push(edge);
+                  } else if (targetNode.data.type === 'telegram') {
+                    telegramNodes.push(edge);
+                  }
+                }
+              });
+
+              // Execute telegram nodes first with "parallel before" context
+              const telegramPromises = telegramNodes.map(edge => {
+                const targetNode = get().nodes.find(n => n.id === edge.target);
+                console.log(`Sending "parallel before" message to Telegram node: ${targetNode?.data.label || edge.target}`);
+                return get().executeNode(edge.target, {
+                  ...fileData,
+                  messageContext: 'before',
+                  originalMessage: node.data.config.message || 'parallel before'
+                });
+              });
+
+              // Execute arweave nodes
+              const arweavePromises = arweaveNodes.map(edge => {
+                const targetNode = get().nodes.find(n => n.id === edge.target);
+                console.log(`Sending file to Arweave node: ${targetNode?.data.label || edge.target}`);
+                return get().executeNode(edge.target, fileData);
+              });
+
+              // Execute all nodes in parallel
+              await Promise.all([...telegramPromises, ...arweavePromises]);
 
               // After 2 seconds, go back to running state
               setTimeout(() => {
@@ -573,15 +634,40 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
         case 'telegram': {
           try {
-            console.log(`Executing Telegram send node (${nodeId})`);
+            console.log(`[${new Date().toISOString()}] Executing Telegram send node (${nodeId})`);
 
             // Import dynamically to avoid circular dependencies
             const { nodeExecutors } = await import('@/lib/utils/api-service');
 
+            // Check if we have context info to determine which message to send
+            let messageToSend = node.data.config.message;
+
+            if (inputData && inputData.messageContext) {
+              if (inputData.messageContext === 'before') {
+                messageToSend = 'parallel before';
+                console.log(`[${new Date().toISOString()}] Using 'parallel before' message based on context`);
+              } else if (inputData.messageContext === 'after') {
+                messageToSend = 'parallel after';
+                console.log(`[${new Date().toISOString()}] Using 'parallel after' message based on context`);
+              }
+
+              // If originalMessage is provided, use that
+              if (inputData.originalMessage) {
+                messageToSend = inputData.originalMessage;
+                console.log(`[${new Date().toISOString()}] Using original message: ${messageToSend}`);
+              }
+            }
+
+            // Create modified config with the appropriate message
+            const modifiedConfig = {
+              ...node.data.config,
+              message: messageToSend
+            };
+
             // Execute the Telegram send operation
-            console.log(`Sending Telegram message with config:`, node.data.config);
-            const sendResult = await nodeExecutors.executeTelegramSend(node.data.config, inputData);
-            console.log(`Message sent successfully:`, sendResult);
+            console.log(`[${new Date().toISOString()}] Sending Telegram message with config:`, modifiedConfig);
+            const sendResult = await nodeExecutors.executeTelegramSend(modifiedConfig, inputData);
+            console.log(`[${new Date().toISOString()}] Message sent successfully:`, sendResult);
 
             // Store the result
             set(state => ({
@@ -598,16 +684,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             // Get outgoing edges from this node
             const outgoingEdges = edges.filter(edge => edge.source === nodeId);
 
-            // Execute the next nodes with the send result as input
-            for (const edge of outgoingEdges) {
+            // Execute all connected nodes in parallel
+            const executionPromises = outgoingEdges.map(edge => {
               const targetNode = nodes.find(n => n.id === edge.target);
-              console.log(`Passing Telegram send result to node: ${targetNode?.data.label || edge.target}`);
-              await get().executeNode(edge.target, sendResult);
-            }
+              console.log(`[${new Date().toISOString()}] Passing Telegram send result to node: ${targetNode?.data.label || edge.target}`);
+              return get().executeNode(edge.target, sendResult);
+            });
+
+            await Promise.all(executionPromises);
 
             result = sendResult;
           } catch (error) {
-            console.error(`Error in Telegram send node:`, error);
+            console.error(`[${new Date().toISOString()}] Error in Telegram send node:`, error);
 
             // Update node state to error
             set(state => ({
@@ -629,15 +717,15 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
               throw new Error('No file data provided to upload');
             }
 
-            console.log(`Arweave upload node received input:`, inputData);
+            console.log(`[${new Date().toISOString()}] Arweave upload node received input:`, inputData);
 
             // Import dynamically to avoid circular dependencies
             const { nodeExecutors } = await import('@/lib/utils/api-service');
 
             // Upload the file to Arweave
-            console.log(`Uploading file to Arweave...`);
+            console.log(`[${new Date().toISOString()}] Starting upload to Arweave...`);
             const uploadResult = await nodeExecutors.executeArweaveUpload(node.data.config, inputData);
-            console.log(`Upload successful:`, uploadResult);
+            console.log(`[${new Date().toISOString()}] Upload successful:`, uploadResult);
 
             // Store the result
             set(state => ({
@@ -654,16 +742,29 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             // Get outgoing edges from this node
             const outgoingEdges = edges.filter(edge => edge.source === nodeId);
 
-            // Execute the next nodes with the upload result as input
-            for (const edge of outgoingEdges) {
+            // Execute all connected nodes in parallel with 'after' context
+            const executionPromises = outgoingEdges.map(edge => {
               const targetNode = nodes.find(n => n.id === edge.target);
-              console.log(`Passing Arweave result to node: ${targetNode?.data.label || edge.target}`);
-              await get().executeNode(edge.target, uploadResult);
-            }
+
+              // Add message context for Telegram nodes coming after Arweave
+              if (targetNode && targetNode.data.type === 'telegram') {
+                console.log(`[${new Date().toISOString()}] Passing 'parallel after' context to Telegram node: ${targetNode?.data.label || edge.target}`);
+                return get().executeNode(edge.target, {
+                  ...uploadResult,
+                  messageContext: 'after',
+                  originalMessage: 'parallel after'
+                });
+              } else {
+                console.log(`[${new Date().toISOString()}] Passing Arweave result to node: ${targetNode?.data.label || edge.target}`);
+                return get().executeNode(edge.target, uploadResult);
+              }
+            });
+
+            await Promise.all(executionPromises);
 
             result = uploadResult;
           } catch (error) {
-            console.error(`Error in Arweave upload node:`, error);
+            console.error(`[${new Date().toISOString()}] Error in Arweave upload node:`, error);
 
             // Update node state to error
             set(state => ({
@@ -688,10 +789,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           // Get outgoing edges from this node
           const outgoingEdges = edges.filter(edge => edge.source === nodeId);
 
-          // Execute the next nodes with the input data
-          for (const edge of outgoingEdges) {
-            get().executeNode(edge.target, inputData);
-          }
+          // Execute all connected nodes in parallel
+          const executionPromises = outgoingEdges.map(edge => {
+            return get().executeNode(edge.target, inputData);
+          });
+
+          await Promise.all(executionPromises);
 
           // Update node state to success
           set(state => ({
@@ -702,9 +805,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           }));
       }
 
+      const endTime = new Date().toISOString();
+      console.log(`[${endTime}] COMPLETED node '${node.data.label}' (${node.data.type}) with ID ${nodeId}`);
       return result;
     } catch (error) {
-      console.error(`Error executing node ${nodeId}:`, error);
+      console.error(`[${new Date().toISOString()}] Error executing node ${nodeId}:`, error);
 
       // Update node state to error
       set(state => ({

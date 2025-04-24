@@ -389,38 +389,38 @@ export const nodeExecutors = {
                 permanent: config.permanent || 'true'
             };
 
-            console.log('Arweave node received file data:', fileData);
+            console.log(`[${new Date().toISOString()}] Arweave node received file data:`, fileData);
 
             if (!fileData || !fileData.id) {
                 throw new Error('No valid file data provided to upload. Received: ' + JSON.stringify(fileData));
             }
 
             // Get the upload cost
-            console.log(`Getting upload cost for file ID: ${fileData.id}`);
+            console.log(`[${new Date().toISOString()}] Getting upload cost for file ID: ${fileData.id}`);
             const costResponse = await ardriveApi.getUploadCost(fileData.id);
 
             if (!costResponse.success) {
                 throw new Error(`Failed to get upload cost: ${costResponse.error || 'Unknown error'}`);
             }
 
-            console.log(`Upload cost: ${costResponse.cost} AR`);
+            console.log(`[${new Date().toISOString()}] Upload cost: ${costResponse.cost} AR`);
 
             // Upload the file to Arweave
-            console.log(`Uploading file ID: ${fileData.id} to Arweave`);
+            console.log(`[${new Date().toISOString()}] Uploading file ID: ${fileData.id} to Arweave (this may take some time)...`);
             const uploadResponse = await ardriveApi.uploadFile(fileData.id);
 
             if (!uploadResponse.success) {
                 throw new Error(`Failed to upload file: ${uploadResponse.error || 'Unknown error'}`);
             }
 
-            console.log(`File uploaded successfully to Arweave. Transaction ID: ${uploadResponse.data?.transactionId}`);
+            console.log(`[${new Date().toISOString()}] File uploaded successfully to Arweave. Transaction ID: ${uploadResponse.data?.transactionId}`);
 
             return {
                 ...uploadResponse.data,
                 originalFile: fileData
             };
         } catch (error) {
-            console.error('Error executing Arweave Upload node:', error);
+            console.error(`[${new Date().toISOString()}] Error executing Arweave Upload node:`, error);
             throw error;
         }
     },
@@ -434,7 +434,7 @@ export const nodeExecutors = {
                 message: config.message || ''
             };
 
-            console.log('Executing Send Telegram node with config:', safeConfig);
+            console.log(`[${new Date().toISOString()}] Executing Send Telegram node with config:`, safeConfig);
 
             // If no chat ID is provided, throw an error
             if (!safeConfig.chatId) {
@@ -447,14 +447,14 @@ export const nodeExecutors = {
             }
 
             // Send the Telegram message
-            console.log(`Sending Telegram message to chat ID: ${safeConfig.chatId}`);
+            console.log(`[${new Date().toISOString()}] Sending Telegram message to chat ID: ${safeConfig.chatId}`);
             const sendResponse = await telegramApi.sendMessage(safeConfig.chatId, safeConfig.message);
 
             if (!sendResponse.success) {
                 throw new Error(`Failed to send Telegram message: ${sendResponse.error || 'Unknown error'}`);
             }
 
-            console.log(`Message sent successfully to chat ID: ${safeConfig.chatId}`);
+            console.log(`[${new Date().toISOString()}] Message sent successfully to chat ID: ${safeConfig.chatId}`);
 
             return {
                 success: true,
