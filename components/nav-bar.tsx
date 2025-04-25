@@ -74,32 +74,6 @@ export function NavBar() {
         >
           <PanelRight className="h-4 w-4" />
         </Button>
-
-        <div className="hidden md:flex items-center space-x-2">
-          <Button variant="outline" onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-
-          <Button variant="outline" onClick={() => loadWorkflow()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Load
-          </Button>
-
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
-
-        <Button variant="outline" onClick={handleRun}>
-          <Play className="h-4 w-4 mr-2" />
-          Run Workflow
-        </Button>
-
-        {/* <Button variant="outline" size="icon" title="Settings">
-          <Settings className="h-4 w-4" />
-        </Button> */}
       </div>
     </nav>
   );
