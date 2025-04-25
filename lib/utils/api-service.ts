@@ -11,6 +11,165 @@ let onNewFileProcessed: ((fileData: any) => void) | null = null;
 // Track the last processed file ID to detect changes
 let lastProcessedFileId: string | null = null;
 
+// Arweave Package Manager (APM) API
+export const apmApi = {
+    // Query for APM package publications using GraphQL
+    queryPackagePublications: async (packageName: string): Promise<{ success: boolean; publications?: any[]; latestVersion?: string; error?: string }> => {
+        try {
+            console.log(`Querying publications for APM package: ${packageName}...`);
+
+            const graphqlEndpoint = 'https://arnode.asia/graphql';
+            const query = {
+                query: `
+                    query {
+                        transactions(
+                            tags: [
+                                { name: "Action", values: ["APM.Publish"] }
+                                { name: "Name", values: ["${packageName}"] }
+                            ]
+                        ) {
+                            edges {
+                                node {
+                                    id
+                                    tags {
+                                        name
+                                        value
+                                    }
+                                }
+                            }
+                        }
+                    }
+                `
+            };
+
+            const response = await fetch(graphqlEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(query)
+            });
+
+            if (!response.ok) {
+                throw new Error(`GraphQL request failed with status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Extract publications from the response
+            const publications = data.data?.transactions?.edges?.map((edge: any) => {
+                const node = edge.node;
+                const tags = node.tags.reduce((acc: Record<string, string>, tag: any) => {
+                    acc[tag.name] = tag.value;
+                    return acc;
+                }, {});
+
+                return {
+                    id: node.id,
+                    version: tags.Version || 'unknown',
+                    name: tags.Name,
+                    timestamp: new Date().toISOString(), // GraphQL doesn't directly return timestamp
+                    tags
+                };
+            }) || [];
+
+            // Sort by transaction ID to get the latest version first
+            // (This assumes newer transactions have higher/newer IDs)
+            publications.sort((a: any, b: any) => {
+                if (a.id > b.id) return -1;
+                if (a.id < b.id) return 1;
+                return 0;
+            });
+
+            console.log(`Found ${publications.length} publications for ${packageName}`);
+
+            // Get the latest version if any publications exist
+            const latestVersion = publications.length > 0 ? publications[0].version : undefined;
+
+            if (latestVersion) {
+                console.log(`Latest version of ${packageName}: ${latestVersion}`);
+            }
+
+            return {
+                success: true,
+                publications,
+                latestVersion
+            };
+        } catch (error) {
+            console.error(`Error querying APM package publications:`, error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+};
+
+// Cryptocurrency API
+export const cryptocurrencyApi = {
+    // Fetch price for a specific token (Arweave or AO)
+    fetchPrice: async (token: string): Promise<{ success: boolean; price?: number; error?: string }> => {
+        try {
+            console.log(`Fetching price for ${token}...`);
+
+            // Validate token type
+            if (token.toLowerCase() !== 'arweave' && token.toLowerCase() !== 'ao') {
+                return {
+                    success: false,
+                    error: `Invalid token type: ${token}. Supported tokens are: arweave, ao`
+                };
+            }
+
+            // Build the URL based on the token type
+            const endpoint = token.toLowerCase() === 'arweave'
+                ? `${API_BASE_URL}/token-price/arweave`
+                : `${API_BASE_URL}/token-price/ao`;
+
+            console.log(`Requesting price from: ${endpoint}`);
+
+            // Make the API request
+            const response = await fetch(endpoint);
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Extract price from the response (adjust this based on actual API response format)
+            let price: number;
+
+            if (token.toLowerCase() === 'arweave') {
+                // Handle Arweave price response format
+                if (!data.price && data.price !== 0) {
+                    throw new Error('Price not found in Arweave API response');
+                }
+                price = parseFloat(data.price);
+            } else {
+                // Handle AO price response format
+                if (!data.price && data.price !== 0) {
+                    throw new Error('Price not found in AO API response');
+                }
+                price = parseFloat(data.price);
+            }
+
+            console.log(`Current ${token} price: $${price.toFixed(2)}`);
+
+            return {
+                success: true,
+                price: price
+            };
+        } catch (error) {
+            console.error(`Error fetching ${token} price:`, error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+};
+
 // Telegram Bot API
 export const telegramApi = {
     // Initialize the Telegram bot
@@ -200,6 +359,242 @@ export const ardriveApi = {
 
 // Node execution functions
 export const nodeExecutors = {
+    // Execute the APM Version Trigger node
+    executeAPMVersionTrigger: async (config: any) => {
+        try {
+            // Ensure we have required config properties with defaults
+            const safeConfig = {
+                packageName: config.packageName || "markdown", // Default to 'markdown' package
+                checkInterval: parseInt(config.checkInterval) || 60, // seconds
+            };
+
+            console.log("Executing APM Version Trigger node with config:", safeConfig);
+
+            // Validate necessary parameters
+            if (!safeConfig.packageName) {
+                throw new Error("Missing required parameter: packageName");
+            }
+
+            // Variables for tracking state
+            let pollInterval: NodeJS.Timeout | null = null;
+            let latestKnownVersion: string | null = null;
+
+            // Return object with methods for controlling the node
+            return {
+                // Start polling for new package versions
+                startPolling: (callback: (versionData: any) => void) => {
+                    const checkIntervalMs = safeConfig.checkInterval * 1000;
+                    console.log(`Starting to poll for ${safeConfig.packageName} updates every ${checkIntervalMs}ms`);
+
+                    // Clear any existing interval
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+
+                    // Make initial query to get the current latest version
+                    apmApi.queryPackagePublications(safeConfig.packageName)
+                        .then(initialResult => {
+                            if (initialResult.success && initialResult.latestVersion) {
+                                latestKnownVersion = initialResult.latestVersion;
+                                console.log(`Initial version of ${safeConfig.packageName}: ${latestKnownVersion}`);
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Error getting initial version:", err);
+                        });
+
+                    // Set up polling
+                    pollInterval = setInterval(async () => {
+                        try {
+                            // Query for the latest version
+                            const result = await apmApi.queryPackagePublications(safeConfig.packageName);
+
+                            if (!result.success || !result.publications || result.publications.length === 0) {
+                                console.error(`Failed to fetch ${safeConfig.packageName} publications:`, result.error);
+                                return;
+                            }
+
+                            const currentLatestVersion = result.latestVersion;
+                            console.log(`Current latest version of ${safeConfig.packageName}: ${currentLatestVersion}`);
+                            console.log(`Previously known version: ${latestKnownVersion || 'none'}`);
+
+                            // If this is our first check, just record the latest version
+                            if (latestKnownVersion === null) {
+                                latestKnownVersion = currentLatestVersion || null;
+                                console.log(`Recorded initial version: ${latestKnownVersion}`);
+                                return;
+                            }
+
+                            // Check if we have a new version
+                            const isNewVersion = latestKnownVersion !== null &&
+                                currentLatestVersion !== undefined &&
+                                currentLatestVersion !== latestKnownVersion;
+
+                            // If we have a new version, trigger the callback
+                            if (isNewVersion && currentLatestVersion) {
+                                console.log(`New version detected! ${safeConfig.packageName} updated from ${latestKnownVersion} to ${currentLatestVersion}`);
+
+                                // Update our latest known version
+                                latestKnownVersion = currentLatestVersion;
+
+                                // Create version data for the callback
+                                const versionData = {
+                                    packageName: safeConfig.packageName,
+                                    version: currentLatestVersion,
+                                    timestamp: new Date().toISOString(),
+                                    publicationDetails: result.publications[0],
+                                    message: `New version of ${safeConfig.packageName} published: ${currentLatestVersion}`
+                                };
+
+                                // Trigger the callback
+                                callback(versionData);
+                            }
+                        } catch (error) {
+                            console.error("Error during APM version polling:", error);
+                        }
+                    }, checkIntervalMs);
+                },
+
+                // Manually check current version (for testing or UI feedback)
+                checkCurrentVersion: async () => {
+                    return await apmApi.queryPackagePublications(safeConfig.packageName);
+                },
+
+                // Stop polling
+                stop: async () => {
+                    console.log(`Stopping version polling for ${safeConfig.packageName}`);
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+                    return { success: true };
+                },
+            };
+        } catch (error) {
+            console.error("Error executing APM Version Trigger node:", error);
+            throw error;
+        }
+    },
+
+    // Execute the Crypto Price Trigger node
+    executeCryptoPriceTrigger: async (config: any) => {
+        try {
+            // Ensure we have required config properties with defaults
+            const safeConfig = {
+                token: config.token || "arweave",
+                targetPrice: parseFloat(config.targetPrice) || 0,
+                comparisonType: config.comparisonType || "above", // 'above' or 'below'
+                checkInterval: parseInt(config.checkInterval) || 30, // seconds
+            };
+
+            console.log("Executing Crypto Price Trigger node with config:", safeConfig);
+
+            // Validate necessary parameters
+            if (!safeConfig.targetPrice) {
+                throw new Error("Missing required parameter: targetPrice");
+            }
+
+            // Set up polling for price changes
+            let pollInterval: NodeJS.Timeout | null = null;
+            let isTriggered = false;
+
+            // Return object with methods for controlling the node
+            return {
+                // Start polling for price changes
+                startPolling: (callback: (priceData: any) => void) => {
+                    const checkIntervalMs = safeConfig.checkInterval * 1000;
+                    console.log(`Starting to poll for ${safeConfig.token} price every ${checkIntervalMs}ms`);
+                    console.log(`Waiting for price to go ${safeConfig.comparisonType} $${safeConfig.targetPrice}`);
+
+                    // Clear any existing interval
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+
+                    // Reset triggered state
+                    isTriggered = false;
+
+                    // Set up polling
+                    pollInterval = setInterval(async () => {
+                        try {
+                            // Skip if already triggered - we only want to trigger once
+                            if (isTriggered) return;
+
+                            // Fetch current price
+                            const priceResponse = await cryptocurrencyApi.fetchPrice(safeConfig.token);
+
+                            if (!priceResponse.success || !priceResponse.price) {
+                                console.error(`Failed to fetch ${safeConfig.token} price:`, priceResponse.error);
+                                return;
+                            }
+
+                            console.log(`Current ${safeConfig.token} price: $${priceResponse.price}`);
+
+                            // Check if price meets the target condition
+                            let conditionMet = false;
+
+                            if (safeConfig.comparisonType === "above") {
+                                conditionMet = priceResponse.price >= safeConfig.targetPrice;
+                            } else if (safeConfig.comparisonType === "below") {
+                                conditionMet = priceResponse.price <= safeConfig.targetPrice;
+                            }
+
+                            // If price condition is met, trigger the callback
+                            if (conditionMet) {
+                                console.log(`Price condition met! ${safeConfig.token} price is ${safeConfig.comparisonType} $${safeConfig.targetPrice}`);
+
+                                // Mark as triggered to prevent multiple executions
+                                isTriggered = true;
+
+                                // Create price data for the callback
+                                const priceData = {
+                                    token: safeConfig.token,
+                                    price: priceResponse.price,
+                                    targetPrice: safeConfig.targetPrice,
+                                    comparisonType: safeConfig.comparisonType,
+                                    timestamp: new Date().toISOString(),
+                                    message: `${safeConfig.token.toUpperCase()} price is now $${priceResponse.price}, which is ${safeConfig.comparisonType} the target of $${safeConfig.targetPrice}`
+                                };
+
+                                // Trigger the callback
+                                callback(priceData);
+
+                                // Clear the interval
+                                if (pollInterval) {
+                                    clearInterval(pollInterval);
+                                    pollInterval = null;
+                                }
+                            }
+                        } catch (error) {
+                            console.error("Error during price polling:", error);
+                        }
+                    }, checkIntervalMs);
+                },
+
+                // Manually check current price (for testing or UI feedback)
+                checkPrice: async () => {
+                    return await cryptocurrencyApi.fetchPrice(safeConfig.token);
+                },
+
+                // Stop polling
+                stop: async () => {
+                    console.log(`Stopping price polling for ${safeConfig.token}`);
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+                    isTriggered = false;
+                    return { success: true };
+                },
+            };
+        } catch (error) {
+            console.error("Error executing Crypto Price Trigger node:", error);
+            throw error;
+        }
+    },
+
     // Execute the Receive Telegram node
     executeTelegramReceive: async (config: any) => {
         try {
@@ -220,8 +615,7 @@ export const nodeExecutors = {
 
             if (!initResponse || !initResponse.success) {
                 throw new Error(
-                    `Failed to initialize Telegram bot: ${
-                        initResponse?.message || "Unknown error"
+                    `Failed to initialize Telegram bot: ${initResponse?.message || "Unknown error"
                     }`
                 );
             }
@@ -236,8 +630,7 @@ export const nodeExecutors = {
 
             if (!startResponse || !startResponse.success) {
                 throw new Error(
-                    `Failed to start Telegram bot: ${
-                        startResponse?.message || "Unknown error"
+                    `Failed to start Telegram bot: ${startResponse?.message || "Unknown error"
                     }`
                 );
             }
@@ -467,8 +860,7 @@ export const nodeExecutors = {
 
                         if (!stopResponse || !stopResponse.success) {
                             console.error(
-                                `Failed to stop Telegram bot: ${
-                                    stopResponse?.message || "Unknown error"
+                                `Failed to stop Telegram bot: ${stopResponse?.message || "Unknown error"
                                 }`
                             );
                         } else {
@@ -502,7 +894,7 @@ export const nodeExecutors = {
             if (!fileData || !fileData.id) {
                 throw new Error(
                     "No valid file data provided to upload. Received: " +
-                        JSON.stringify(fileData)
+                    JSON.stringify(fileData)
                 );
             }
 
@@ -512,8 +904,7 @@ export const nodeExecutors = {
 
             if (!costResponse.success) {
                 throw new Error(
-                    `Failed to get upload cost: ${
-                        costResponse.error || "Unknown error"
+                    `Failed to get upload cost: ${costResponse.error || "Unknown error"
                     }`
                 );
             }
@@ -526,20 +917,51 @@ export const nodeExecutors = {
 
             if (!uploadResponse.success) {
                 throw new Error(
-                    `Failed to upload file: ${
-                        uploadResponse.error || "Unknown error"
+                    `Failed to upload file: ${uploadResponse.error || "Unknown error"
                     }`
                 );
             }
 
             console.log(
-                `File uploaded successfully to Arweave. Transaction ID: ${uploadResponse.data?.transactionId}`
+                `File uploaded successfully to Arweave. Response:`, uploadResponse
             );
 
-            return {
-                ...uploadResponse.data,
+            // Create a consistent response structure
+            // Extract the transaction ID from the response, checking different possible formats
+            const transactionId = uploadResponse.data?.transactionId ||
+                uploadResponse.transactionId ||
+                uploadResponse.id;
+
+            // Extract the Arweave URL, checking different possible formats
+            let arweaveUrl = uploadResponse.data?.arweave_url ||
+                uploadResponse.data?.arweaveUrl ||
+                uploadResponse.arweave_url ||
+                uploadResponse.arweaveUrl;
+
+            // If no arweave_url is provided but we have transaction ID, construct the URL
+            if (!arweaveUrl && transactionId) {
+                console.log(`No arweave_url provided in response, constructing from transaction ID: ${transactionId}`);
+                arweaveUrl = `https://arweave.net/${transactionId}`;
+            }
+
+            // Log the URL for debugging
+            if (arweaveUrl) {
+                console.log(`Final Arweave URL: ${arweaveUrl}`);
+            } else {
+                console.warn(`Could not determine Arweave URL from response:`, uploadResponse);
+            }
+
+            // Return a consistent structure
+            const result = {
+                ...(uploadResponse.data || {}),
+                arweave_url: arweaveUrl,
+                arweaveUrl: arweaveUrl, // Add camelCase version for consistency
+                transactionId: transactionId,
                 originalFile: fileData,
             };
+
+            console.log(`Final result object:`, result);
+            return result;
         } catch (error) {
             console.error("Error executing Arweave Upload node:", error);
             throw error;
@@ -559,6 +981,7 @@ export const nodeExecutors = {
                 "Executing Send Telegram node with config:",
                 safeConfig
             );
+            console.log("Input data received:", inputData);
 
             // If no chat ID is provided, throw an error
             if (!safeConfig.chatId) {
@@ -572,19 +995,74 @@ export const nodeExecutors = {
                 );
             }
 
+            // Process message template with variables
+            let finalMessage = safeConfig.message;
+
+            // Check if we have Arweave URL in the input data
+            if (inputData) {
+                console.log("Processing message template with input data");
+
+                // Check for Arweave URL in different possible formats
+                const arweaveUrl = inputData.arweave_url ||
+                    inputData.arweaveUrl ||
+                    (inputData.upload_result && inputData.upload_result.arweave_url) ||
+                    (inputData.data && inputData.data.arweave_url);
+
+                if (arweaveUrl) {
+                    console.log(`Found Arweave URL: ${arweaveUrl}`);
+
+                    // Check if message already contains the URL template or URL value
+                    const containsTemplate = finalMessage.includes('{arweave_url}');
+                    const containsUrl = finalMessage.includes(arweaveUrl);
+
+                    if (containsTemplate) {
+                        // Replace template variable with actual URL
+                        finalMessage = finalMessage.replace(/\{arweave_url\}/g, arweaveUrl);
+                        console.log(`Replaced {arweave_url} template with actual URL`);
+                    } else if (!containsUrl && inputData.isFromArweaveNode) {
+                        // Only auto-append if this data is coming directly from an Arweave node
+                        console.log(`Message doesn't contain URL template or actual URL and data is from Arweave node, appending URL automatically`);
+
+                        // Format the message nicely depending on its current content
+                        if (finalMessage.trim() === '') {
+                            // If message is empty, just use the URL
+                            finalMessage = `File uploaded to Arweave: ${arweaveUrl}`;
+                        } else if (finalMessage.endsWith('.') || finalMessage.endsWith('!') || finalMessage.endsWith('?') || finalMessage.endsWith(':')) {
+                            // If message ends with punctuation, add the URL on a new line
+                            finalMessage = `${finalMessage}\n\nFile uploaded to Arweave: ${arweaveUrl}`;
+                        } else {
+                            // Otherwise add with proper punctuation
+                            finalMessage = `${finalMessage}. File uploaded to Arweave: ${arweaveUrl}`;
+                        }
+                    } else if (!containsUrl && !inputData.isFromArweaveNode) {
+                        // If not from Arweave node, don't auto-append but log it was found
+                        console.log(`Arweave URL found but not auto-appending as this is not directly from an Arweave node`);
+                    }
+                } else {
+                    console.warn("No Arweave URL found in input data");
+                }
+
+                // If message contains filename template and we have filename in input
+                if (inputData.fileName || inputData.originalFile?.fileName) {
+                    const fileName = inputData.fileName || inputData.originalFile?.fileName;
+                    finalMessage = finalMessage.replace(/\{filename\}/g, fileName);
+                }
+            }
+
+            console.log(`Final message after template processing: ${finalMessage}`);
+
             // Send the Telegram message
             console.log(
                 `Sending Telegram message to chat ID: ${safeConfig.chatId}`
             );
             const sendResponse = await telegramApi.sendMessage(
                 safeConfig.chatId,
-                safeConfig.message
+                finalMessage
             );
 
             if (!sendResponse.success) {
                 throw new Error(
-                    `Failed to send Telegram message: ${
-                        sendResponse.error || "Unknown error"
+                    `Failed to send Telegram message: ${sendResponse.error || "Unknown error"
                     }`
                 );
             }
@@ -596,7 +1074,8 @@ export const nodeExecutors = {
             return {
                 success: true,
                 sentTo: safeConfig.chatId,
-                message: safeConfig.message,
+                message: finalMessage,
+                originalMessage: safeConfig.message,
                 response: sendResponse,
                 inputData,
             };
