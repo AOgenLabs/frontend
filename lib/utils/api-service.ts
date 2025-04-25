@@ -1,6 +1,6 @@
 // API service for interacting with the backend services
 
-const API_BASE_URL = "http://18.206.120.157/api";
+const API_BASE_URL = "https://api-flowweave.vesala.xyz/api";
 
 // Track if the bot is active across the application
 let isBotActive = false;
