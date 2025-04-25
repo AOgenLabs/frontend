@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Save,
@@ -49,8 +50,14 @@ export function NavBar() {
     <nav className="border-b border-border bg-card p-4 flex justify-between items-center z-10">
       <div className="flex items-center space-x-2">
         <Link href="/" className="flex items-center">
-          <Workflow className="h-6 w-6 text-primary mr-2" />
-          <span className="text-xl font-semibold text-primary">FlowWeave</span>
+          <Image
+            src="/logo.png"
+            alt="FlowWeave Logo"
+            width={38}
+            height={38}
+          // className="mr-2"
+          />
+          <span className="text-xl font-semibold text-primary">Flowweave</span>
         </Link>
       </div>
 
